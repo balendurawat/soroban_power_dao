@@ -35,3 +35,35 @@ fn create_dao_contract(e: &Env, admin: &AccountId) -> (BytesN<32>, DaoContractCl
     client.with_source_account(admin).init();
     (contract_id.into(), client)
 }
+
+#[test]
+
+fn test() {
+    let env = Env::default();
+
+    let user_1 = env.accounts().generate();
+
+    let (dao_contract, client) = create_dao_contract(&env, &user_1);
+    let (token_contract_id, token_client) = create_token_contract(&env, &user_1);
+
+
+    assert_eq!(
+        1,
+        client
+            .with_source_account(&user_1)
+            .shares(&Account(user_1.clone()))
+    );
+
+    env.ledger().set(LedgerInfo {
+        timestamp: env.ledger().timestamp() + 1,
+        protocol_version: 1,
+        sequence_number: 1,
+        network_passphrase: Default::default(),
+        base_reserve: 1,
+    });
+    
+
+
+
+
+}
