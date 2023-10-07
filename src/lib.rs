@@ -120,9 +120,35 @@ pub trait DaoTrait {
     fn c_prop(env: Env, proposal: Proposal) -> u32;
     fn execute(env: Env, prop_id: u32);
     fn shares(env: Env, of: Address) -> i32;
-    fn tot_shares(env: Env) -> i32;
+    fn total_shares(env: Env) -> i32;
     fn vote(env: Env, prop_id: u32);
 }
 
 // Define the 'DaoContract' struct, which will implement the 'DaoTrait' contract functions
 pub struct DaoContract;
+
+
+fn update_total_supply(env: &Env, amount: i32) {
+    let tot_shares = total_shares(env);
+
+    env.data().set(DataKey::TotSupply, tot_shares + amount)
+}
+
+fn total_shares(env: &Env) -> i32 {
+    let total_share = env.data().get(DataKey::TotalSupply).unwrap_or(Ok(0))
+
+    total_share
+}
+
+fn get_admin(env: &Env) -> Option<Result<Address, ConversionError>> {
+    env.data().get(DataKey::Admin)
+}
+
+fn set_admin(env: &Env, admin: Address) {
+    env.data().set(DataKey::Admin, admin)
+}
+
+fn check_admin(env: &Env) -> bool {
+    env.invoker() === env.data().get(DataKey::Admin).unwrap().unwrap()
+}
+
