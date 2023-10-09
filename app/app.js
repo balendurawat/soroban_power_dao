@@ -1,62 +1,71 @@
-// Import or include Web3.js library
-const Web3 = require('web3');
+// Initialize Web3.js with your Ethereum provider (e.g., MetaMask)
+const web3 = new Web3(Web3.givenProvider);
 
-// Create a Web3 instance and connect to your Ethereum provider (e.g., MetaMask)
-const web3 = new Web3(window.ethereum);
-
-// Define the contract ABI (Application Binary Interface) and contract address
-const contractABI = [
-  // Include the ABI here, you can obtain it from the contract deployment
-  // Example: { "constant": true, "inputs": [], "name": "getAdmin", "outputs": [{ "name": "", "type": "address" }], "payable": false, "stateMutability": "view", "type": "function" },
-  // Add other contract functions as needed
-];
-
-const contractAddress = '0xYourContractAddress';
+// Replace with your contract address and ABI
+const contractAddress = "YOUR_CONTRACT_ADDRESS";
+const contractAbi = [...]; // Your contract ABI
 
 // Create a contract instance
-const contract = new web3.eth.Contract(contractABI, contractAddress);
+const contract = new web3.eth.Contract(contractAbi, contractAddress);
 
-// Example: Get the current admin of the DAO
-contract.methods.getAdmin().call()
-  .then(adminAddress => {
-    console.log('Current Admin:', adminAddress);
-  })
-  .catch(error => {
-    console.error('Error:', error);
-  });
+// Function to initialize the smart contract
+async function initializeContract() {
+    try {
+        const accounts = await web3.eth.requestAccounts();
+        const senderAddress = accounts[0];
 
-// Example: Transfer shares to another address
-const recipientAddress = '0xRecipientAddress';
-const amount = 100;
+        // Call the initialize function in your smart contract
+        await contract.methods.initialize().send({ from: senderAddress });
 
-// Make sure the sender has sufficient shares and is authorized to transfer
-contract.methods.transferShares(recipientAddress, amount).send({ from: '0xYourAccountAddress' })
-  .then(receipt => {
-    console.log('Shares transferred. Transaction Hash:', receipt.transactionHash);
-  })
-  .catch(error => {
-    console.error('Error:', error);
-  });
+        // You can update the UI or show a success message here
+    } catch (error) {
+        console.error("Error initializing contract:", error);
+    }
+}
 
-// Example: Create a proposal
-const proposalDetails = {
-  totVotes: 0,
-  instructions: [
-    {
-      cId: '0xContractID',
-      funName: 'addShares',
-      args: [10, '0xRecipientAddress'],
-    },
-    // Add more instructions if needed
-  ],
-  endTime: Math.floor(Date.now() / 1000) + 3600, // Proposal end time in UNIX timestamp
-};
+// Function to transfer assets
+async function transferAssets() {
+    try {
+        const accounts = await web3.eth.requestAccounts();
+        const senderAddress = accounts[0];
 
-// Make sure to sign the transaction using your Ethereum wallet
-contract.methods.createProposal(proposalDetails).send({ from: '0xYourAccountAddress' })
-  .then(receipt => {
-    console.log('Proposal created. Transaction Hash:', receipt.transactionHash);
-  })
-  .catch(error => {
-    console.error('Error:', error);
-  });
+        // Replace with the amount and recipient address
+        const amount = 10;
+        const recipientAddress = "RECIPIENT_ADDRESS";
+
+        // Call the transfer function in your smart contract
+        await contract.methods.transfer_hidden_assets(amount, recipientAddress).send({ from: senderAddress });
+
+        // You can update the UI or show a success message here
+    } catch (error) {
+        console.error("Error transferring assets:", error);
+    }
+}
+
+// Function to create a proposal
+async function createProposal() {
+    try {
+        const accounts = await web3.eth.requestAccounts();
+        const senderAddress = accounts[0];
+
+        // Replace with your proposal details
+        const proposal = {
+            total_votes: 0,
+            deadline: Math.floor(Date.now() / 1000) + 3600 * 24 * 7, // 1 week from now
+            instructions: [], // Add your instructions here
+        };
+
+        // Call the create_secret_proposal function in your smart contract
+        const proposalId = await contract.methods.create_secret_proposal(proposal).send({ from: senderAddress });
+
+        // You can update the UI or show a success message here
+        console.log("Proposal ID:", proposalId);
+    } catch (error) {
+        console.error("Error creating proposal:", error);
+    }
+}
+
+// Add event listeners to UI elements
+document.getElementById("initializeButton").addEventListener("click", initializeContract);
+document.getElementById("transferAssetsButton").addEventListener("click", transferAssets);
+document.getElementById("createProposalButton").addEventListener("click", createProposal);
