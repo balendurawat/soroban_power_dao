@@ -1,59 +1,5 @@
-// Start
-// |
-// v
-// Define Data Structures
-// |
-// v
-// Define Contract Functions
-// |
-// v
-// Define Initialization Logic
-// |
-// v
-// Is
-// Security
-// Important? 
-// |   |
-// |   v
-// Yes  No
-// |   |
-// |   v
-// Define Security Mechanisms
-// |   |
-// |   v
-// Implement Access Control
-// |
-// v
-// Define Share Transfer Logic
-// |
-// v
-// Define Proposal Creation Logic
-// |
-// v
-// Define Proposal Execution Logic
-// |
-// v
-// Implement Voting Mechanism
-// |
-// v
-// Enforce Contract Rules
-// |
-// v
-// Write Utility Functions
-// |
-// v
-// Unit Testing & Debugging
-// |
-// v
-// End - Contract Complete
-
-
-
-
-
 #![no_std]
 
-// Import necessary libraries
 use core::{panic};
 
 use soroban_sdk::{
@@ -61,244 +7,256 @@ use soroban_sdk::{
     Env, RawVal, Symbol, TryFromVal, Vec,
 };
 
-// Import the 'token' module from an external file
 mod token {
     soroban_sdk::contractimport!(file = "./soroban_token_spec.wasm");
 }
 
-
-// Define a contract type named 'ProposalVote' with two fields: 'voter' and 'prop_id'
 #[contracttype]
 #[derive(Clone, Debug)]
-pub struct ProposalVote {
+pub struct SecretVote {
     pub voter: Address,
     pub prop_id: u32,
 }
 
-// Define an enum named 'DataKey' to represent various keys used for contract data
 #[derive(Clone)]
 #[contracttype]
-pub enum DataKey {
-    Admin,
-    TotSupply,
-    Balance(Address),
-    Bootstrap,
-    Proposal(u32),
-    ProposalId,
-    Voted(ProposalVote),
-    Executed(u32)
+pub enum HiddenData {
+    PrivateAdmin,
+    TotalSupply,
+    UserBalance(Address),
+    SecretBootstrap,
+    EncryptedProposal(u32),
+    CurrentProposalId,
+    VoteRecord(SecretVote),
+    ExecutionStatus(u32)
 }
 
-// Define a contract type named 'ProposalInstr' with fields: 'c_id', 'fun_name', and 'args'
 #[contracttype]
 #[derive(Clone, Debug)]
-pub struct ProposalInstr {
-    // Contract ID
-    pub c_id: BytesN<32>,
-    pub fun_name: Symbol,
-    pub args: Vec<RawVal>,
+pub struct HiddenInstruction {
+    //contract id
+    pub contract_id: BytesN<32>,
+    pub function_name: Symbol,
+    pub arguments: Vec<RawVal>,
 }
 
-
-
-// Define a contract type named 'Proposal' with fields: 'tot_votes', 'end_time', and 'instr'
 #[contracttype]
 #[derive(Clone, Debug)]
-pub struct Proposal {
-    pub tot_votes: i32,
-    pub end_time: u64,
-    // Instructions will be executed in sequence
-    pub instr: Vec<ProposalInstr>,
+pub struct ClassifiedProposal {
+    pub total_votes: i32,
+    pub deadline: u64,
+    // instructions will be executed in sequence
+    pub instructions: Vec<HiddenInstruction>,
 }
 
-
-
-// Define a trait named 'DaoTrait' with various contract functions
-
-pub trait DaoTrait {
-    // fn test(env : Env) -> Address;
-    fn init(env: Env);
-    // transfer sahres if admin and if in bootstrap period
-    fn x_shares(env: Env, amount: i32, to: Address);
-    // fn vote(env : Env1)
-
-    //create proposal and return its id
-    fn c_prop(env: Env, proposal: Proposal) -> u32;
-
-    //try to execute prop
-    fn execute(env: Env, prop_id: u32);
-
-    //get number of reputation or shares of the address
-    fn shares(env: Env, of: Address) -> i32;
-
-    //get total number of rep/shares that members hold
-    fn tot_shares(env: Env) -> i32;
-
-    //allow a member to vote on a proposal]
-    fn vote(env: Env, prop_id: u32);
+pub trait UndisclosedDaoTrait {
+    fn initialize(env: Env);
+    fn transfer_hidden_assets(env: Env, amount: i32, to: Address);
+    fn create_secret_proposal(env: Env, proposal: ClassifiedProposal) -> u32;
+    fn attempt_execution(env: Env, prop_id: u32);
+    fn check_user_assets(env: Env, owner: Address) -> i32;
+    fn total_concealed_assets(env: Env) -> i32;
+    fn cast_secret_ballot(env: Env, prop_id: u32);
 }
 
+pub struct SecretDaoContract;
 
-// Define the 'DaoContract' struct, which will implement the 'DaoTrait' contract functions
-pub struct DaoContract;
+#[contractimpl]
+impl UndisclosedDaoTrait for SecretDaoContract {
+    fn initialize(env: Env) {
+        if None != verify_secret_admin(&env) {
+            panic!();
+        }
+        // Designate the caller as the confidential administrator
+        set_secret_administrator(&env, env.invoker());
+        // Allocate 1 concealed asset to the caller
+        transfer_hidden_assets(&env, 1, env.invoker());
 
+        // Allow the administrator to disburse concealed assets for a week
+        env.data()
+            .set(HiddenData::SecretBootstrap, env.ledger().timestamp() + 3600 * 24 * 7);
+    }
 
+    fn transfer_hidden_assets(env: Env, amount: i32, to: Address) {
+        // Trigger an error if not the administrator
+        if !validate_secret_admin(&env) {
+            panic!();
+        }
 
+        // Trigger an error if not within the bootstrap period
+        if !check_secret_bootstrap_period(&env) {
+            panic!()
+        }
+        allocate_hidden_assets(&env, amount, to)
+    }
 
+    fn create_secret_proposal(env: Env, proposal: ClassifiedProposal) -> u32 {
+        assert!(proposal.total_votes == 0);
 
+        let next_id = acquire_and_increment_secret_proposal_id(&env);
 
+        env.data().set(HiddenData::EncryptedProposal(next_id), proposal.clone());
 
+        next_id
+    }
 
+    fn attempt_execution(env: Env, prop_id: u32) {
 
+        // Execution is only permitted once
+        assert!(!has_been_executed(&env, prop_id));
 
+        let prop = env
+            .data()
+            .get::<_, ClassifiedProposal>(HiddenData::EncryptedProposal(prop_id))
+            .unwrap()
+            .unwrap();
 
+        // Execution can only take place prior to the deadline
+        assert!(prop.deadline > env.ledger().timestamp());
+        // Majority of concealed assets is required for execution
+        assert!(prop.total_votes > total_concealed_assets(&env) / 2);
 
+        // Code block that doesn't work
+        // let authorized_contract_functions = map![&env, (symbol!("authorized_concealed_assets_fn"), Self::authorized_concealed_assets_fn)];
 
+        for result in prop.instructions {
+            match result {
+                Ok(instruction) => {
+                    if env.current_contract() == instruction.contract_id {
+                        if instruction.function_name == symbol!("transfer_hidden_assets") {
+                            let amount =
+                                i32::try_from_val(&env, instruction.arguments.get(0).unwrap().unwrap())
+                                    .unwrap();
+                            let recipient =
+                                Address::try_from_val(&env, instruction.arguments.get(1).unwrap().unwrap())
+                                    .unwrap();
+                            allocate_hidden_assets(&env, amount, recipient);
+                        }
+                    } else {
+                        env.invoke_contract(&instruction.contract_id, &instruction.function_name, instruction.arguments)
+                    }
+                }
+                Err(_) => panic!(),
+            }
+        }
+        record_execution(&env, prop_id);
+    }
 
+    fn check_user_assets(env: Env, owner: Address) -> i32 {
+        access_hidden_assets(&env, owner)
+    }
 
+    fn total_concealed_assets(env: Env) -> i32 {
+        compute_total_hidden_assets(&env)
+    }
 
+    fn cast_secret_ballot(env: Env, prop_id: u32) {
+        assert!(!has_cast_vote(&env, env.invoker(), prop_id));
 
+        let mut prop = env
+            .data()
+            .get::<_, ClassifiedProposal>(HiddenData::EncryptedProposal(prop_id))
+            .unwrap()
+            .unwrap();
 
+        // Verify the validity of the proposal
+        assert!(prop.deadline > env.ledger().timestamp());
 
+        let user_assets = access_hidden_assets(&env, env.invoker());
 
+        prop.total_votes = prop.total_votes + user_assets;
 
+        env.data()
+        .set(HiddenData::EncryptedProposal(prop_id), prop);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// fn init
-// fn x_shares
-// fn c_prop
-// fn execute
-// fn shares
-// tot_shares
-// vote
-
-
-
-
-
-
-// execution
-
-fn set_executed(env: &Env, prop_id: u32){
-    env.data().set(DataKey::Executed(prop_id), true)
+        env.data().set(
+            HiddenData::VoteRecord(SecretVote {
+                voter: env.invoker(),
+                prop_id,
+            }),
+            true,
+        );
+    }
 }
 
-fn get_executed(env: &Env, prop_id: u32)-> bool{
-    env.data().get(DataKey::Executed(prop_id))
+fn record_execution(env: &Env, prop_id: u32){
+    env.data().set(HiddenData::ExecutionStatus(prop_id), true)
+}
+
+fn has_been_executed(env: &Env, prop_id: u32)-> bool{
+    env.data().get(HiddenData::ExecutionStatus(prop_id))
     .unwrap_or(Ok(false))
     .unwrap()
 }
 
-
-// for voting check
-
-
-fn voted(env: &Env, voter: Address, prop_id: u32) -> bool{
-    return env.data().get(DataKey::Voted(ProposalVote {
+fn has_cast_vote(env: &Env, voter: Address, prop_id: u32) -> bool{
+    return env.data().get(HiddenData::VoteRecord(SecretVote {
         voter: voter.clone(),
         prop_id,
     })).unwrap_or(Ok(false)).unwrap()
 }
 
-// get the proposal id 
-
-
-fn get_and_include_proposal_id(env: &Env) -> u32 {
-    let prev = env
+fn acquire_and_increment_secret_proposal_id(env: &Env) -> u32 {
+    let previous = env
         .data()
-        .get(DataKey::ProposalId)
+        .get(HiddenData::CurrentProposalId)
         .unwrap_or(Ok(0u32))
         .unwrap();
 
-    env.data().set(DataKey::ProposalId, prev + 1);
-    prev
+    env.data().set(HiddenData::CurrentProposalId, previous + 1);
+    previous
 }
 
-// get the bootstrap time
-
-fn check_boot_strap(env: &Env) -> bool {
+fn check_secret_bootstrap_period(env: &Env) -> bool {
     env.data()
-        .get::<_, u64>(DataKey::Bootstrap)
+        .get::<_, u64>(HiddenData::SecretBootstrap)
         .unwrap()
         .unwrap()
         > env.ledger().timestamp()
 }
 
-
-
-// check shares available
-
-fn get_shares(env: &Env, of: Address) -> i32 {
+fn access_hidden_assets(env: &Env, owner: Address) -> i32 {
     env.data()
-        .get(DataKey::Balance(of))
+        .get(HiddenData::UserBalance(owner))
         .unwrap_or(Ok(0))
         .unwrap()
 }
 
-
-// add the shares
-
-fn add_shares(env: &Env, amount: i32, to: Address) {
-    let current_shares = env
+fn allocate_hidden_assets(env: &Env, amount: i32, to: Address) {
+    let current_assets = env
         .data()
-        .get(DataKey::Balance(to.clone()))
+        .get(HiddenData::UserBalance(to.clone()))
         .unwrap_or(Ok(0))
         .unwrap();
 
     env.data()
-        .set(DataKey::Balance(to), amount + current_shares);
+        .set(HiddenData::UserBalance(to), amount + current_assets);
 
-    update_total_supply(env, amount)
+    modify_total_hidden_assets(env, amount)
 }
 
+fn modify_total_hidden_assets(env: &Env, amount: i32) {
+    let total_assets = compute_total_hidden_assets(env);
 
-fn update_total_supply(env: &Env, amount: i32) {
-    let total_shares = tot_shares(env);
-
-    env.data().set(DataKey::TotSupply, total_shares + amount)
+    env.data().set(HiddenData::TotalSupply, total_assets + amount)
 }
 
-
-fn total_shares(env: &Env) -> i32 {
-    let total_share = env.data().get(DataKey::TotalSupply).unwrap_or(Ok(0))
-
-    total_share
+fn compute_total_hidden_assets(env: &Env) -> i32 {
+    let total_assets = env.data().get(HiddenData::TotalSupply).unwrap_or(Ok(0)).unwrap();
+    total_assets
 }
 
-
-
-
-
-// admin functions
-fn get_admin(env: &Env) -> Option<Result<Address, ConversionError>> {
-    env.data().get(DataKey::Admin)
+fn validate_secret_admin(env: &Env) -> bool {
+    env.invoker() == env.data().get(HiddenData::PrivateAdmin).unwrap().unwrap()
 }
 
-fn check_admin(env: &Env) -> bool {
-    env.invoker() === env.data().get(DataKey::Admin).unwrap().unwrap()
+fn verify_secret_admin(env: &Env) -> Option<Result<Address, ConversionError>> {
+    env.data().get(HiddenData::PrivateAdmin)
 }
 
-fn set_admin(env: &Env, admin: Address) {
-    env.data().set(DataKey::Admin, admin)
+fn set_secret_administrator(env: &Env, admin: Address) {
+    env.data().set(HiddenData::PrivateAdmin, admin)
 }
-
 
 #[cfg(test)]
-mod test
+mod disguised_test;
